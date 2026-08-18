@@ -35,6 +35,7 @@ export default function Board({
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   async function addColumn() {
     setMenuOpen(false);
@@ -142,6 +143,18 @@ export default function Board({
     });
   }
 
+  async function deleteTicket(ticket: Ticket) {
+    if (!confirm(`Delete ticket "${ticket.title}"? This cannot be undone.`)) return;
+    setColumns((prev) =>
+      prev.map((c) =>
+        c.id === ticket.columnId
+          ? { ...c, tickets: c.tickets.filter((t) => t.id !== ticket.id) }
+          : c
+      )
+    );
+    await fetch(`/api/tickets/${ticket.id}`, { method: "DELETE" });
+  }
+
   return (
     <>
       <div className="board-toolbar">
@@ -208,6 +221,59 @@ export default function Board({
                 setOverCol(null);
               }}
             >
+              {(() => {
+                const prev = prevColumn(t.columnId);
+                const next = nextColumn(t.columnId);
+                const open = openMenuId === t.id;
+                return (
+                  <>
+                    <button
+                      className="ticket-menu-btn"
+                      title="Options"
+                      aria-expanded={open}
+                      onClick={() => setOpenMenuId(open ? null : t.id)}
+                    >
+                      ⋯
+                    </button>
+                    {open && (
+                      <>
+                        <div className="dropdown-backdrop" onClick={() => setOpenMenuId(null)} />
+                        <div className="ticket-menu">
+                          <button
+                            className="ticket-menu-item"
+                            disabled={!prev}
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              if (prev) moveToColumn(t, prev);
+                            }}
+                          >
+                            ← Back{prev ? ` to ${prev.name}` : ""}
+                          </button>
+                          <button
+                            className="ticket-menu-item"
+                            disabled={!next}
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              if (next) moveToColumn(t, next);
+                            }}
+                          >
+                            Advance{next ? ` to ${next.name}` : ""} →
+                          </button>
+                          <button
+                            className="ticket-menu-item danger"
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              deleteTicket(t);
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
               <div className="ticket-title">{t.title}</div>
               {t.description && <div className="ticket-desc">{t.description}</div>}
               {(() => {

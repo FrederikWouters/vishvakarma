@@ -392,10 +392,12 @@ button:hover {
 }
 
 .ticket {
+  position: relative;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 10px 12px;
+  /* Vertical padding raised by 0.5rem each side => tickets are 1rem taller. */
+  padding: 18px 12px;
   margin-bottom: 8px;
   cursor: grab;
 }
@@ -411,6 +413,8 @@ button:hover {
 .ticket-title {
   font-weight: 600;
   font-size: 14px;
+  /* Leave room for the options (⋯) button in the corner. */
+  padding-right: 22px;
 }
 
 .ticket-desc {
@@ -419,6 +423,71 @@ button:hover {
   margin-top: 4px;
 }
 
+/* Options (⋯) button + menu */
+.ticket-menu-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.ticket-menu-btn:hover {
+  background: var(--panel);
+  color: var(--text);
+  filter: none;
+}
+
+.ticket-menu {
+  position: absolute;
+  top: 26px;
+  right: 6px;
+  z-index: 11;
+  min-width: 180px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.ticket-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--text);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ticket-menu-item:hover:not(:disabled) {
+  background: var(--panel-2);
+  filter: none;
+}
+
+.ticket-menu-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ticket-menu-item.danger {
+  color: #ff6b6b;
+}
+
+/* Bottom Advance / Back buttons */
 .ticket-actions {
   display: flex;
   justify-content: flex-end;
