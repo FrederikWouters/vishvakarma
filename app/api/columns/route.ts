@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { isBoardSlug } from "@/lib/boards";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const projectId = typeof body?.projectId === "string" ? body.projectId : "";
   const name = typeof body?.name === "string" ? body.name.trim() : "";
-  const order = Number.isInteger(body?.order) ? body.order : 0;
+  const board = typeof body?.board === "string" ? body.board : "";
 
   if (!projectId || !name) {
     return NextResponse.json({ error: "projectId and name are required" }, { status: 400 });
+  }
+  if (!isBoardSlug(board)) {
+    return NextResponse.json({ error: "board must be analysis, development, or acceptance" }, { status: 400 });
   }
 
   const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -16,8 +20,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
+  // Append to the end of the project's column ordering.
+  const last = await prisma.column.findFirst({
+    where: { projectId },
+    orderBy: { order: "desc" },
+  });
+  const order = last ? last.order + 1 : 0;
+
   const column = await prisma.column.create({
-    data: { projectId, name, order },
+    data: { projectId, name, board, order },
   });
 
   return NextResponse.json(column, { status: 201 });

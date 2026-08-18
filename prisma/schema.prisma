@@ -15,16 +15,19 @@ model Project {
   columns   Column[]
 }
 
-// A board column / swimlane (e.g. To Do, In Progress, Done)
+// A board column / swimlane (e.g. Open, Analysing, Analysed).
+// `board` groups columns into one of the three boards: analysis | development | acceptance.
 model Column {
   id        String   @id @default(cuid())
   name      String
+  board     String   @default("analysis")
   order     Int
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tickets   Ticket[]
 
   @@index([projectId])
+  @@index([projectId, board])
 }
 
 model Ticket {

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-
-const DEFAULT_COLUMNS = ["To Do", "In Progress", "Done"];
+import { DEFAULT_COLUMNS } from "@/lib/boards";
 
 export async function GET() {
   const projects = await prisma.project.findMany({
@@ -29,7 +28,7 @@ export async function POST(req: Request) {
       name,
       key,
       columns: {
-        create: DEFAULT_COLUMNS.map((n, i) => ({ name: n, order: i })),
+        create: DEFAULT_COLUMNS.map((c, i) => ({ name: c.name, board: c.board, order: i })),
       },
     },
   });

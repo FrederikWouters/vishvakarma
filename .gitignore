@@ -6,6 +6,7 @@
 .env
 .DS_Store
 next-env.d.ts
+*.tsbuildinfo
 
 # Prisma / SQLite
 /prisma/*.db

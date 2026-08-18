@@ -42,8 +42,216 @@ a {
   font-size: 18px;
 }
 
+.shell {
+  display: flex;
+  align-items: stretch;
+  min-height: calc(100vh - 52px);
+}
+
 main {
+  flex: 1;
+  min-width: 0;
   padding: 24px;
+}
+
+/* Sidebar */
+.sidebar {
+  flex: 0 0 240px;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  padding: 12px 10px;
+  overflow-y: auto;
+}
+
+.sidebar-home {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sidebar-home:hover,
+.sidebar-home.active {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.sidebar-tree {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-empty {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.sidebar-project-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 7px 8px;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-project-btn:hover {
+  background: var(--panel-2);
+  filter: none;
+}
+
+.sidebar-project-btn.active {
+  color: var(--text);
+}
+
+.chevron {
+  display: inline-block;
+  transition: transform 0.15s;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+.sidebar-key {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sidebar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-boards {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 6px 22px;
+  border-left: 1px solid var(--border);
+}
+
+.sidebar-board {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--muted);
+  border-radius: 0 8px 8px 0;
+}
+
+.sidebar-board:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.sidebar-board.active {
+  background: var(--panel-2);
+  color: var(--accent);
+  font-weight: 600;
+  border-left: 2px solid var(--accent);
+  margin-left: -1px;
+}
+
+/* Board toolbar: tabs on the left, configure dropdown on the right */
+.board-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.board-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+/* Dropdown */
+.dropdown {
+  position: relative;
+  padding-bottom: 6px;
+}
+
+.dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.dropdown-trigger .caret {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.dropdown-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+}
+
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 11;
+  min-width: 180px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--text);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dropdown-item:hover {
+  background: var(--panel);
+  filter: none;
+}
+
+.board-tab {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.board-tab:hover {
+  color: var(--text);
+}
+
+.board-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
 .page-title {
@@ -209,6 +417,43 @@ button:hover {
   color: var(--muted);
   font-size: 12px;
   margin-top: 4px;
+}
+
+.ticket-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.move-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.move-btn:hover {
+  background: var(--panel);
+  filter: none;
+}
+
+.advance-btn {
+  color: var(--accent);
+}
+
+.advance-btn:hover {
+  border-color: var(--accent);
+}
+
+.back-btn {
+  color: var(--muted);
+}
+
+.back-btn:hover {
+  color: var(--text);
 }
 
 .add-ticket {

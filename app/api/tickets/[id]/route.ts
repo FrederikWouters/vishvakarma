@@ -25,12 +25,24 @@ export async function PATCH(
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  try {
-    const ticket = await prisma.ticket.update({ where: { id }, data });
-    return NextResponse.json(ticket);
-  } catch {
+  const existing = await prisma.ticket.findUnique({ where: { id } });
+  if (!existing) {
     return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
   }
+
+  // Moving to a different column without an explicit order: append to the end
+  // of the target column. Lets "Advance" work across boards without the client
+  // knowing the target column's current contents.
+  if (data.columnId && data.columnId !== existing.columnId && data.order === undefined) {
+    const last = await prisma.ticket.findFirst({
+      where: { columnId: data.columnId },
+      orderBy: { order: "desc" },
+    });
+    data.order = last ? last.order + 1 : 0;
+  }
+
+  const ticket = await prisma.ticket.update({ where: { id }, data });
+  return NextResponse.json(ticket);
 }
 
 export async function DELETE(
