@@ -1,0 +1,12 @@
+/node_modules
+/.next
+/out
+/build
+*.log
+.env
+.DS_Store
+next-env.d.ts
+
+# Prisma / SQLite
+/prisma/*.db
+/prisma/*.db-journal
