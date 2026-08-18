@@ -24,7 +24,6 @@ export default async function HomePage() {
         <div className="project-grid">
           {projects.map((p) => (
             <a key={p.id} href={`/projects/${p.id}/board/analysis`} className="project-card">
-              <div className="key">{p.key}</div>
               <div className="name">{p.name}</div>
               <div className="subtle" style={{ fontSize: 12, marginTop: 6 }}>
                 {p._count.columns} columns

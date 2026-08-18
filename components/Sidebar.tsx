@@ -39,7 +39,6 @@ export default function Sidebar({ projects }: { projects: SidebarProject[] }) {
                 aria-expanded={open}
               >
                 <span className={`chevron${open ? " open" : ""}`}>▸</span>
-                <span className="sidebar-key">{p.key}</span>
                 <span className="sidebar-name">{p.name}</span>
               </button>
 
