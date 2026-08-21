@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useDialogs } from "./Dialogs";
+import { LIMITS } from "@/lib/limits";
 
 export default function NewProjectForm() {
   const router = useRouter();
+  const dialogs = useDialogs();
   const [name, setName] = useState("");
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,7 +28,10 @@ export default function NewProjectForm() {
       router.refresh();
     } else {
       const { error } = await res.json().catch(() => ({ error: "Failed" }));
-      alert(error ?? "Failed to create project");
+      await dialogs.alert({
+        title: "Couldn't create project",
+        message: error ?? "Failed to create project",
+      });
     }
   }
 
@@ -34,6 +40,7 @@ export default function NewProjectForm() {
       <input
         placeholder="Project name"
         value={name}
+        maxLength={LIMITS.projectName}
         onChange={(e) => setName(e.target.value)}
         style={{ minWidth: 220 }}
       />
@@ -42,7 +49,7 @@ export default function NewProjectForm() {
         value={key}
         onChange={(e) => setKey(e.target.value)}
         style={{ width: 140 }}
-        maxLength={10}
+        maxLength={LIMITS.projectKey}
       />
       <button type="submit" disabled={busy}>
         {busy ? "Creating…" : "Create project"}
