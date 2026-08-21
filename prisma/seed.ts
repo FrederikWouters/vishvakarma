@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { DEFAULT_COLUMNS } from "../lib/boards";
 
 const prisma = new PrismaClient();
 
@@ -14,23 +15,42 @@ async function main() {
       name: "Vishvakarma Core",
       key: "VSK",
       columns: {
-        create: [
-          { name: "To Do", order: 0 },
-          { name: "In Progress", order: 1 },
-          { name: "Done", order: 2 },
-        ],
+        create: DEFAULT_COLUMNS.map((c, i) => ({ name: c.name, board: c.board, order: i })),
       },
     },
     include: { columns: { orderBy: { order: "asc" } } },
   });
 
-  const [todo, doing] = project.columns;
+  const open = project.columns.find((c) => c.name === "Open")!;
+  const developing = project.columns.find((c) => c.name === "Developing")!;
 
+  // number is per-project sequential; projectId is required — both were added
+  // by the VSK-8 migration and must be set here.
   await prisma.ticket.createMany({
     data: [
-      { columnId: todo.id, title: "Set up project board", order: 0, description: "Swimlanes + tickets" },
-      { columnId: todo.id, title: "Add drag-and-drop", order: 1 },
-      { columnId: doing.id, title: "Design data model", order: 0, description: "Project / Column / Ticket" },
+      {
+        columnId: open.id,
+        projectId: project.id,
+        number: 1,
+        order: 0,
+        title: "Set up project board",
+        description: "Swimlanes + tickets",
+      },
+      {
+        columnId: open.id,
+        projectId: project.id,
+        number: 2,
+        order: 1,
+        title: "Add drag-and-drop",
+      },
+      {
+        columnId: developing.id,
+        projectId: project.id,
+        number: 3,
+        order: 0,
+        title: "Design data model",
+        description: "Project / Column / Ticket",
+      },
     ],
   });
 

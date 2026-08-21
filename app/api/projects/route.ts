@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { DEFAULT_COLUMNS } from "@/lib/boards";
+import { LIMITS } from "@/lib/limits";
+import { revalidateProjectsEverywhere, revalidateSettings } from "@/lib/revalidate";
 
 export async function GET() {
   const projects = await prisma.project.findMany({
@@ -16,6 +18,18 @@ export async function POST(req: Request) {
 
   if (!name || !key) {
     return NextResponse.json({ error: "name and key are required" }, { status: 400 });
+  }
+  if (name.length > LIMITS.projectName) {
+    return NextResponse.json(
+      { error: `Project name must be ${LIMITS.projectName} characters or fewer` },
+      { status: 400 }
+    );
+  }
+  if (key.length > LIMITS.projectKey) {
+    return NextResponse.json(
+      { error: `Key must be ${LIMITS.projectKey} characters or fewer` },
+      { status: 400 }
+    );
   }
 
   const existing = await prisma.project.findUnique({ where: { key } });
@@ -33,5 +47,8 @@ export async function POST(req: Request) {
     },
   });
 
+  // Refreshes the home grid and the sidebar (root layout) on every route.
+  revalidateProjectsEverywhere();
+  revalidateSettings();
   return NextResponse.json(project, { status: 201 });
 }

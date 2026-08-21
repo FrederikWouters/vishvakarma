@@ -13,6 +13,21 @@ model Project {
   key       String   @unique
   createdAt DateTime @default(now())
   columns   Column[]
+  tickets   Ticket[]
+  labels    Label[]
+}
+
+// A tag/label, scoped to a project, that can be attached to many tickets.
+model Label {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#6b7280")
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tickets   Ticket[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
 }
 
 // A board column / swimlane (e.g. Open, Analysing, Analysed).
@@ -35,9 +50,15 @@ model Ticket {
   title       String
   description String?
   order       Int
+  // Per-project sequential number, shown as `{project.key}-{number}` (e.g. VSK-12).
+  number      Int
   columnId    String
   column      Column   @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  labels      Label[]
   createdAt   DateTime @default(now())
 
+  @@unique([projectId, number])
   @@index([columnId])
 }

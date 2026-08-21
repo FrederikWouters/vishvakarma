@@ -1,5 +1,32 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { LIMITS } from "@/lib/limits";
+import { revalidateBoards, revalidateSettings } from "@/lib/revalidate";
+
+// Server-side backstop for description HTML (the client already allowlist-
+// sanitizes). Strips script/style blocks, inline event handlers, and
+// javascript: URLs so nothing dangerous is ever persisted.
+function stripDangerousHtml(html: string): string {
+  return html
+    .replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src)\s*=\s*("javascript:[^"]*"|'javascript:[^']*')/gi, "");
+}
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const ticket = await prisma.ticket.findUnique({
+    where: { id },
+    include: { labels: { orderBy: { name: "asc" } } },
+  });
+  if (!ticket) {
+    return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+  }
+  return NextResponse.json(ticket);
+}
 
 export async function PATCH(
   req: Request,
@@ -13,13 +40,34 @@ export async function PATCH(
     order?: number;
     title?: string;
     description?: string | null;
+    labels?: { set: { id: string }[] };
   } = {};
 
   if (typeof body?.columnId === "string") data.columnId = body.columnId;
   if (Number.isInteger(body?.order)) data.order = body.order;
   if (typeof body?.title === "string") data.title = body.title.trim();
   if (typeof body?.description === "string")
-    data.description = body.description.trim() || null;
+    data.description = stripDangerousHtml(body.description).trim() || null;
+
+  if (data.title !== undefined && data.title.length > LIMITS.ticketTitle) {
+    return NextResponse.json(
+      { error: `Title must be ${LIMITS.ticketTitle} characters or fewer` },
+      { status: 400 }
+    );
+  }
+  if (data.description && data.description.length > LIMITS.ticketDescription) {
+    return NextResponse.json(
+      { error: `Description is too long (max ${LIMITS.ticketDescription} characters)` },
+      { status: 400 }
+    );
+  }
+  // Replace the ticket's label set with exactly the given ids.
+  if (Array.isArray(body?.labelIds)) {
+    const ids: string[] = body.labelIds.filter(
+      (v: unknown): v is string => typeof v === "string"
+    );
+    data.labels = { set: ids.map((id) => ({ id })) };
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
@@ -41,7 +89,13 @@ export async function PATCH(
     data.order = last ? last.order + 1 : 0;
   }
 
-  const ticket = await prisma.ticket.update({ where: { id }, data });
+  const ticket = await prisma.ticket.update({
+    where: { id },
+    data,
+    include: { labels: { orderBy: { name: "asc" } } },
+  });
+  revalidateBoards();
+  revalidateSettings();
   return NextResponse.json(ticket);
 }
 
@@ -52,6 +106,8 @@ export async function DELETE(
   const { id } = await params;
   try {
     await prisma.ticket.delete({ where: { id } });
+    revalidateBoards();
+    revalidateSettings();
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Ticket not found" }, { status: 404 });

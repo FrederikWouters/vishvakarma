@@ -3,8 +3,6 @@ import { notFound } from "next/navigation";
 import Board from "@/components/Board";
 import { boardLabel, isBoardSlug } from "@/lib/boards";
 
-export const dynamic = "force-dynamic";
-
 export default async function BoardPage({
   params,
 }: {
@@ -19,7 +17,12 @@ export default async function BoardPage({
       columns: {
         where: { board },
         orderBy: { order: "asc" },
-        include: { tickets: { orderBy: { order: "asc" } } },
+        include: {
+          tickets: {
+            orderBy: { order: "asc" },
+            include: { labels: { orderBy: { name: "asc" } } },
+          },
+        },
       },
     },
   });
@@ -50,6 +53,7 @@ export default async function BoardPage({
       ) : (
         <Board
           projectId={project.id}
+          projectKey={project.key}
           board={board}
           sequence={sequence}
           initialColumns={project.columns.map((c) => ({
@@ -61,7 +65,9 @@ export default async function BoardPage({
               title: t.title,
               description: t.description,
               order: t.order,
+              number: t.number,
               columnId: t.columnId,
+              labels: t.labels.map((l) => ({ id: l.id, name: l.name, color: l.color })),
             })),
           }))}
         />

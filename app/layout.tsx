@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { prisma } from "@/lib/db";
 import Sidebar from "@/components/Sidebar";
+import { DialogProvider } from "@/components/Dialogs";
 
 export const metadata: Metadata = {
   title: "Vishvakarma",
   description: "A Jira-like project board with swimlanes and tickets",
 };
-
-export const dynamic = "force-dynamic";
 
 export default async function RootLayout({
   children,
@@ -27,11 +26,16 @@ export default async function RootLayout({
           <a href="/" className="brand">
             Vishvakarma
           </a>
+          <a href="/settings" className="topbar-link">
+            Settings
+          </a>
         </header>
-        <div className="shell">
-          <Sidebar projects={projects} />
-          <main>{children}</main>
-        </div>
+        <DialogProvider>
+          <div className="shell">
+            <Sidebar projects={projects} />
+            <main>{children}</main>
+          </div>
+        </DialogProvider>
       </body>
     </html>
   );

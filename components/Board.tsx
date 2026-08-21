@@ -2,13 +2,25 @@
 
 import { useState } from "react";
 import { BOARDS } from "@/lib/boards";
+import TicketModal from "./TicketModal";
+import { useDialogs } from "./Dialogs";
+import { stripHtml } from "@/lib/html";
+import { LIMITS } from "@/lib/limits";
+
+export type Label = {
+  id: string;
+  name: string;
+  color: string;
+};
 
 export type Ticket = {
   id: string;
   title: string;
   description: string | null;
   order: number;
+  number: number;
   columnId: string;
+  labels: Label[];
 };
 
 export type ColumnData = {
@@ -22,11 +34,13 @@ export type SequenceColumn = { id: string; name: string; board: string };
 
 export default function Board({
   projectId,
+  projectKey,
   board,
   sequence,
   initialColumns,
 }: {
   projectId: string;
+  projectKey: string;
   board: string;
   sequence: SequenceColumn[];
   initialColumns: ColumnData[];
@@ -34,26 +48,21 @@ export default function Board({
   const [columns, setColumns] = useState<ColumnData[]>(initialColumns);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  // The ticket the drop indicator sits *before* within `overCol`; null = append
+  // to the end of the column.
+  const [dropBeforeId, setDropBeforeId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
-  async function addColumn() {
-    setMenuOpen(false);
-    const name = prompt("Column name (e.g. To Do)");
-    if (!name?.trim()) return;
-    const res = await fetch("/api/columns", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, board, name: name.trim() }),
-    });
-    if (res.ok) {
-      const col: ColumnData = await res.json();
-      setColumns((prev) => [...prev, { ...col, tickets: [] }]);
-    }
-  }
+  const [modalTicketId, setModalTicketId] = useState<string | null>(null);
+  const dialogs = useDialogs();
 
   async function addTicket(columnId: string) {
-    const title = prompt("Ticket title");
+    const title = await dialogs.prompt({
+      title: "Add ticket",
+      label: "Ticket title",
+      placeholder: "What needs doing?",
+      confirmText: "Add",
+      maxLength: LIMITS.ticketTitle,
+    });
     if (!title?.trim()) return;
     const col = columns.find((c) => c.id === columnId);
     const order = col ? col.tickets.length : 0;
@@ -63,44 +72,95 @@ export default function Board({
       body: JSON.stringify({ columnId, title: title.trim(), order }),
     });
     if (res.ok) {
-      const ticket: Ticket = await res.json();
+      const created = await res.json();
+      // The create endpoint doesn't return labels; a new ticket has none.
+      const ticket: Ticket = { ...created, labels: created.labels ?? [] };
       setColumns((prev) =>
         prev.map((c) => (c.id === columnId ? { ...c, tickets: [...c.tickets, ticket] } : c))
       );
     }
   }
 
-  async function moveTicket(ticketId: string, toColumnId: string) {
-    // Find source
+  function updateTicket(updated: Ticket) {
+    setColumns((prev) =>
+      prev.map((c) => ({
+        ...c,
+        tickets: c.tickets.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)),
+      }))
+    );
+  }
+
+  function resetDrag() {
+    setDragId(null);
+    setOverCol(null);
+    setDropBeforeId(null);
+  }
+
+  async function reorderColumn(cols: ColumnData[], columnId: string): Promise<boolean> {
+    const col = cols.find((c) => c.id === columnId);
+    if (!col) return true;
+    try {
+      const res = await fetch("/api/tickets/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ columnId, orderedIds: col.tickets.map((t) => t.id) }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  // Drop the dragged ticket into `toColumnId` immediately before `beforeId`
+  // (or at the end when beforeId is null). Handles both within-lane reordering
+  // and cross-lane drops at a position.
+  async function dropTicket(ticketId: string, toColumnId: string, beforeId: string | null) {
     let moved: Ticket | undefined;
-    const next = columns.map((c) => {
-      const idx = c.tickets.findIndex((t) => t.id === ticketId);
-      if (idx >= 0) {
-        moved = c.tickets[idx];
-        return { ...c, tickets: c.tickets.filter((t) => t.id !== ticketId) };
+    let fromColumnId: string | undefined;
+    columns.forEach((c) => {
+      const t = c.tickets.find((x) => x.id === ticketId);
+      if (t) {
+        moved = t;
+        fromColumnId = c.id;
       }
-      return c;
     });
-    if (!moved || moved.columnId === toColumnId) {
-      setOverCol(null);
-      setDragId(null);
+    if (!moved || !fromColumnId || beforeId === ticketId) {
+      resetDrag();
       return;
     }
-    const target = next.find((c) => c.id === toColumnId)!;
-    const newOrder = target.tickets.length;
-    const updated = { ...moved, columnId: toColumnId, order: newOrder };
-    setColumns(
-      next.map((c) => (c.id === toColumnId ? { ...c, tickets: [...c.tickets, updated] } : c))
-    );
-    setOverCol(null);
-    setDragId(null);
 
-    // Persist
-    await fetch(`/api/tickets/${ticketId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ columnId: toColumnId, order: newOrder }),
+    // Remove from its current column, then insert into the target.
+    const withoutTicket = columns.map((c) =>
+      c.tickets.some((t) => t.id === ticketId)
+        ? { ...c, tickets: c.tickets.filter((t) => t.id !== ticketId) }
+        : c
+    );
+    const movedTicket: Ticket = { ...moved, columnId: toColumnId };
+    const next = withoutTicket.map((c) => {
+      if (c.id !== toColumnId) return c;
+      const arr = [...c.tickets];
+      const at = beforeId ? arr.findIndex((t) => t.id === beforeId) : -1;
+      if (at < 0) arr.push(movedTicket);
+      else arr.splice(at, 0, movedTicket);
+      return { ...c, tickets: arr };
     });
+
+    const snapshot = columns;
+    setColumns(next);
+    resetDrag();
+
+    // Persist the new ordering: the target column always, the source column too
+    // when it changed (its remaining tickets' orders shifted). If either write
+    // fails, roll the board back so it doesn't drift from the database.
+    let ok = await reorderColumn(next, toColumnId);
+    if (ok && fromColumnId !== toColumnId) ok = await reorderColumn(next, fromColumnId);
+    if (!ok) {
+      setColumns(snapshot);
+      dialogs.alert({
+        title: "Couldn't move ticket",
+        message: "The change wasn't saved. The board has been restored.",
+      });
+    }
   }
 
   // Adjacent columns in the whole project sequence, or null at the ends.
@@ -119,6 +179,7 @@ export default function Board({
   // Move a ticket to an adjacent column (used by both Advance and Back).
   async function moveToColumn(ticket: Ticket, target: SequenceColumn) {
     const targetVisible = columns.some((c) => c.id === target.id);
+    const snapshot = columns;
     setColumns((prev) => {
       const cleared = prev.map((c) =>
         c.id === ticket.columnId
@@ -136,15 +197,35 @@ export default function Board({
     });
 
     // Server appends to the end of the target column (no order sent).
-    await fetch(`/api/tickets/${ticket.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ columnId: target.id }),
-    });
+    let ok = false;
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ columnId: target.id }),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      setColumns(snapshot);
+      dialogs.alert({
+        title: "Couldn't move ticket",
+        message: "The change wasn't saved. The board has been restored.",
+      });
+    }
   }
 
   async function deleteTicket(ticket: Ticket) {
-    if (!confirm(`Delete ticket "${ticket.title}"? This cannot be undone.`)) return;
+    const ok = await dialogs.confirm({
+      title: "Delete ticket",
+      message: `Delete "${ticket.title}"? This cannot be undone.`,
+      confirmText: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    const snapshot = columns;
     setColumns((prev) =>
       prev.map((c) =>
         c.id === ticket.columnId
@@ -152,7 +233,20 @@ export default function Board({
           : c
       )
     );
-    await fetch(`/api/tickets/${ticket.id}`, { method: "DELETE" });
+    let deleted = false;
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}`, { method: "DELETE" });
+      deleted = res.ok;
+    } catch {
+      deleted = false;
+    }
+    if (!deleted) {
+      setColumns(snapshot);
+      dialogs.alert({
+        title: "Couldn't delete ticket",
+        message: "The ticket wasn't deleted. The board has been restored.",
+      });
+    }
   }
 
   return (
@@ -169,26 +263,6 @@ export default function Board({
             </a>
           ))}
         </nav>
-
-        <div className="dropdown">
-          <button
-            className="ghost dropdown-trigger"
-            onClick={() => setMenuOpen((o) => !o)}
-            aria-expanded={menuOpen}
-          >
-            Configure columns <span className="caret">▾</span>
-          </button>
-          {menuOpen && (
-            <>
-              <div className="dropdown-backdrop" onClick={() => setMenuOpen(false)} />
-              <div className="dropdown-menu">
-                <button className="dropdown-item" onClick={addColumn}>
-                  + Add column
-                </button>
-              </div>
-            </>
-          )}
-        </div>
       </div>
 
       <div className="board">
@@ -197,13 +271,16 @@ export default function Board({
           key={col.id}
           className={`column${overCol === col.id ? " drag-over" : ""}`}
           onDragOver={(e) => {
+            if (!dragId) return;
             e.preventDefault();
+            // Hovering the column's empty area → drop at the end.
             if (overCol !== col.id) setOverCol(col.id);
+            setDropBeforeId(null);
           }}
           onDragLeave={(e) => {
             if (e.currentTarget === e.target) setOverCol(null);
           }}
-          onDrop={() => dragId && moveTicket(dragId, col.id)}
+          onDrop={() => dragId && dropTicket(dragId, col.id, dropBeforeId)}
         >
           <div className="column-title">
             <span>{col.name}</span>
@@ -211,14 +288,37 @@ export default function Board({
           </div>
 
           {col.tickets.map((t) => (
+            <div key={`slot-${t.id}`}>
+            {overCol === col.id && dropBeforeId === t.id && (
+              <div className="drop-indicator" />
+            )}
             <div
               key={t.id}
               className={`ticket${dragId === t.id ? " dragging" : ""}`}
               draggable
               onDragStart={() => setDragId(t.id)}
-              onDragEnd={() => {
-                setDragId(null);
-                setOverCol(null);
+              onDragEnd={resetDrag}
+              onDragOver={(e) => {
+                if (!dragId || dragId === t.id) return;
+                e.preventDefault();
+                e.stopPropagation();
+                // Above the card's midpoint drops before it; below drops before
+                // the next card (or at the end for the last card).
+                const rect = e.currentTarget.getBoundingClientRect();
+                const after = e.clientY - rect.top > rect.height / 2;
+                const idx = col.tickets.findIndex((x) => x.id === t.id);
+                const beforeId = after
+                  ? col.tickets[idx + 1]?.id ?? null
+                  : t.id;
+                if (overCol !== col.id) setOverCol(col.id);
+                if (dropBeforeId !== beforeId) setDropBeforeId(beforeId);
+              }}
+              onClick={(e) => {
+                // Don't open the modal when clicking a button (⋯ menu, Back/
+                // Advance) or while the options menu is open.
+                if ((e.target as HTMLElement).closest("button")) return;
+                if (openMenuId) return;
+                setModalTicketId(t.id);
               }}
             >
               {(() => {
@@ -274,8 +374,18 @@ export default function Board({
                   </>
                 );
               })()}
+              <div className="ticket-id">{projectKey}-{t.number}</div>
               <div className="ticket-title">{t.title}</div>
-              {t.description && <div className="ticket-desc">{t.description}</div>}
+              {t.description && <div className="ticket-desc">{stripHtml(t.description)}</div>}
+              {t.labels.length > 0 && (
+                <div className="ticket-labels">
+                  {t.labels.map((l) => (
+                    <span key={l.id} className="chip chip-sm" style={{ backgroundColor: l.color }}>
+                      {l.name}
+                    </span>
+                  ))}
+                </div>
+              )}
               {(() => {
                 const prev = prevColumn(t.columnId);
                 const next = nextColumn(t.columnId);
@@ -304,7 +414,11 @@ export default function Board({
                 );
               })()}
             </div>
+            </div>
           ))}
+          {overCol === col.id && dropBeforeId === null && dragId && (
+            <div className="drop-indicator" />
+          )}
 
           <button className="add-ticket" onClick={() => addTicket(col.id)}>
             + Add ticket
@@ -312,6 +426,22 @@ export default function Board({
         </div>
       ))}
       </div>
+
+      {modalTicketId && (() => {
+        const t = columns.flatMap((c) => c.tickets).find((x) => x.id === modalTicketId);
+        if (!t) return null;
+        const statusName = columns.find((c) => c.id === t.columnId)?.name ?? "";
+        return (
+          <TicketModal
+            ticket={t}
+            projectId={projectId}
+            projectKey={projectKey}
+            statusName={statusName}
+            onClose={() => setModalTicketId(null)}
+            onSaved={updateTicket}
+          />
+        );
+      })()}
     </>
   );
 }
