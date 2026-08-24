@@ -40,12 +40,12 @@ The ticket list below is a dated snapshot. For the *current* state, read the DB.
 cd /mnt/c/Users/frede/Vishvakarma && python3 - <<'PY'
 import sqlite3
 c=sqlite3.connect('prisma/dev.db'); c.row_factory=sqlite3.Row
-rows=c.execute('''select p.key,col.board,col.name col,t.title,t.description
+rows=c.execute('''select p.key,t.number,col.board,col.name col,t.title,t.description
   from Ticket t join "Column" col on col.id=t.columnId
   join Project p on p.id=col.projectId
   order by p.key,col."order",t."order"''').fetchall()
 for r in rows:
-    print(f'{r["key"]:4}| {r["board"]:11}| {r["col"]:11}| {r["title"]}')
+    print(f'{r["key"]}-{r["number"]:<3}| {r["board"]:11}| {r["col"]:11}| {r["title"]}')
 PY
 ```
 

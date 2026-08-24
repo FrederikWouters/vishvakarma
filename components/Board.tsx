@@ -66,19 +66,29 @@ export default function Board({
     if (!title?.trim()) return;
     const col = columns.find((c) => c.id === columnId);
     const order = col ? col.tickets.length : 0;
-    const res = await fetch("/api/tickets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ columnId, title: title.trim(), order }),
-    });
-    if (res.ok) {
-      const created = await res.json();
-      // The create endpoint doesn't return labels; a new ticket has none.
-      const ticket: Ticket = { ...created, labels: created.labels ?? [] };
-      setColumns((prev) =>
-        prev.map((c) => (c.id === columnId ? { ...c, tickets: [...c.tickets, ticket] } : c))
-      );
+    let created: Ticket | null = null;
+    try {
+      const res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ columnId, title: title.trim(), order }),
+      });
+      if (res.ok) created = await res.json();
+    } catch {
+      created = null;
     }
+    if (!created) {
+      dialogs.alert({
+        title: "Couldn't add ticket",
+        message: "The ticket wasn't created. Please try again.",
+      });
+      return;
+    }
+    // The create endpoint doesn't return labels; a new ticket has none.
+    const ticket: Ticket = { ...created, labels: created.labels ?? [] };
+    setColumns((prev) =>
+      prev.map((c) => (c.id === columnId ? { ...c, tickets: [...c.tickets, ticket] } : c))
+    );
   }
 
   function updateTicket(updated: Ticket) {

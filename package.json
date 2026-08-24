@@ -16,6 +16,11 @@
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
+    "@tiptap/extension-details": "^3.30.2",
+    "@tiptap/extension-table": "^3.30.2",
+    "@tiptap/pm": "^3.30.2",
+    "@tiptap/react": "^3.30.2",
+    "@tiptap/starter-kit": "^3.30.2",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -24,6 +29,7 @@
     "@types/node": "^22.10.7",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
+    "jsdom": "^30.0.1",
     "prisma": "^6.2.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",

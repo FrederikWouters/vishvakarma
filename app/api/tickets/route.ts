@@ -20,6 +20,12 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+  if (description && description.length > LIMITS.ticketDescription) {
+    return NextResponse.json(
+      { error: `Description is too long (max ${LIMITS.ticketDescription} characters)` },
+      { status: 400 }
+    );
+  }
 
   const column = await prisma.column.findUnique({ where: { id: columnId } });
   if (!column) {

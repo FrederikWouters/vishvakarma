@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Ticket, Label } from "./Board";
 import { RichTextEditor, sanitizeHtml, stripHtml } from "./RichText";
+import { useDialogs } from "./Dialogs";
 import { LIMITS } from "@/lib/limits";
 import { trapTab } from "./focusTrap";
 
@@ -35,6 +36,7 @@ export default function TicketModal({
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const dialogs = useDialogs();
 
   // Load the project's existing labels for the picker.
   useEffect(() => {
@@ -82,38 +84,55 @@ export default function TicketModal({
 
   async function save() {
     setSaving(true);
-    // Flush a label the user typed but didn't click "Add" — otherwise Save
-    // would silently drop it. Build the final id list from the result, not
-    // from React state (setState is async and wouldn't be visible yet).
-    let finalLabels = labels;
-    if (newName.trim()) {
-      const created = await createLabel();
-      if (created && !finalLabels.some((l) => l.id === created.id)) {
-        finalLabels = [...finalLabels, created];
+    try {
+      // Flush a label the user typed but didn't click "Add" — otherwise Save
+      // would silently drop it. Build the final id list from the result, not
+      // from React state (setState is async and wouldn't be visible yet).
+      let finalLabels = labels;
+      if (newName.trim()) {
+        const created = await createLabel();
+        if (created && !finalLabels.some((l) => l.id === created.id)) {
+          finalLabels = [...finalLabels, created];
+        }
       }
+      // Sanitize the editor HTML; collapse an effectively-empty body to "".
+      const cleanHtml = sanitizeHtml(description);
+      const descOut = stripHtml(cleanHtml) ? cleanHtml : "";
+      const res = await fetch(`/api/tickets/${ticket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim() || ticket.title,
+          description: descOut,
+          labelIds: finalLabels.map((l) => l.id),
+        }),
+      });
+      if (!res.ok) {
+        // Surface the failure instead of silently returning; the modal stays
+        // open so the user's edits aren't lost (VSK-21).
+        await dialogs.alert({
+          title: "Couldn't save ticket",
+          message: "Your changes weren't saved. Please try again.",
+        });
+        return;
+      }
+      const updated = await res.json();
+      onSaved({
+        ...ticket,
+        title: updated.title,
+        description: updated.description,
+        labels: updated.labels ?? finalLabels,
+      });
+      onClose();
+    } catch {
+      // Network error / fetch threw — don't leave the button stuck on "Saving…".
+      await dialogs.alert({
+        title: "Couldn't save ticket",
+        message: "Your changes weren't saved. Please try again.",
+      });
+    } finally {
+      setSaving(false);
     }
-    // Sanitize the editor HTML; collapse an effectively-empty body to "".
-    const cleanHtml = sanitizeHtml(description);
-    const descOut = stripHtml(cleanHtml) ? cleanHtml : "";
-    const res = await fetch(`/api/tickets/${ticket.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: title.trim() || ticket.title,
-        description: descOut,
-        labelIds: finalLabels.map((l) => l.id),
-      }),
-    });
-    setSaving(false);
-    if (!res.ok) return;
-    const updated = await res.json();
-    onSaved({
-      ...ticket,
-      title: updated.title,
-      description: updated.description,
-      labels: updated.labels ?? finalLabels,
-    });
-    onClose();
   }
 
   const unusedLabels = allLabels.filter((l) => !hasLabel(l.id));
@@ -125,6 +144,7 @@ export default function TicketModal({
         className="modal"
         role="dialog"
         aria-modal="true"
+        aria-label={`Ticket ${projectKey}-${ticket.number}`}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => trapTab(e, modalRef.current)}
       >

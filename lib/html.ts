@@ -7,6 +7,11 @@ const ALLOWED_TAGS = new Set([
   "P", "BR", "STRONG", "B", "EM", "I", "U",
   "H2", "H3", "CODE", "PRE", "DETAILS", "SUMMARY",
   "UL", "OL", "LI",
+  // Tables — minimal grid only. No attributes are ever kept (below), so
+  // colspan/rowspan/colgroup/style emitted by the editor are stripped and the
+  // editor re-parses a plain grid on reopen. TipTap's detailsContent wrapper
+  // <div> is unwrapped (DIV not allowed), leaving valid <details> HTML.
+  "TABLE", "THEAD", "TBODY", "TR", "TH", "TD",
 ]);
 
 // Allowlist sanitizer. Runs in the browser (uses DOMParser); on the server it

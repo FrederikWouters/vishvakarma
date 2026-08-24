@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -85,6 +86,7 @@ function DialogHost({ state, close }: { state: DialogState; close: () => void })
   const inputRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   function cancel() {
     if (state.kind === "prompt") state.resolve(null);
@@ -126,10 +128,11 @@ function DialogHost({ state, close }: { state: DialogState; close: () => void })
         className="modal modal-sm"
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => trapTab(e, dialogRef.current)}
       >
-        <div className="dialog-title">{state.opts.title}</div>
+        <div className="dialog-title" id={titleId}>{state.opts.title}</div>
 
         {state.kind === "prompt" && (
           <>
