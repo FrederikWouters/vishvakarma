@@ -231,18 +231,38 @@ async function cmdList(flags: Record<string, string>) {
   }
 }
 
+async function cmdShow(positional: string[]) {
+  const ref = positional[0];
+  if (!ref) die("error: show needs a ticket ref, e.g. VSK-12");
+  const m = /^([A-Za-z]+)-(\d+)$/.exec(ref.trim());
+  if (!m) die(`error: ticket ref must be KEY-NUMBER (e.g. VSK-12), got '${ref}'`);
+  const proj = await findProject(m[1]);
+  const t = await prisma.ticket.findFirst({
+    where: { projectId: proj.id, number: Number(m[2]) },
+    include: { column: true, labels: { select: { name: true } } },
+  });
+  if (!t) die(`error: no ticket ${proj.key}-${m[2]}`);
+  console.log(`${proj.key}-${t.number}  [${t.column.board}/${t.column.name}]  ${t.title}`);
+  const labels = t.labels.map((l) => l.name).join(", ");
+  if (labels) console.log(`labels: ${labels}`);
+  console.log("---");
+  console.log(t.description ?? "(no description)");
+}
+
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const { flags, positional } = parseArgs(rest);
   if (cmd === "create") await cmdCreate(flags);
   else if (cmd === "edit") await cmdEdit(positional, flags);
   else if (cmd === "list") await cmdList(flags);
+  else if (cmd === "show") await cmdShow(positional);
   else
     die(
-      "usage: npx tsx scripts/board.ts {create|edit|list} ...\n" +
+      "usage: npx tsx scripts/board.ts {create|edit|list|show} ...\n" +
         "  create --project VSK --title '...' [--description '...'] [--column Open]\n" +
         "  edit VSK-12 [--title '...'] [--description '...'] [--column Developing]\n" +
-        "  list [--project VSK]",
+        "  list [--project VSK]\n" +
+        "  show VSK-12",
     );
 }
 
