@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/db";
 import NewProjectForm from "@/components/NewProjectForm";
 
+// Render on every request: the board is also written out-of-band by
+// scripts/board.ts (direct DB), which never triggers revalidatePath, so a
+// cached page would show stale data until a redeploy (VSK-38).
+export const revalidate = 0;
+
 export default async function HomePage() {
   const projects = await prisma.project.findMany({
     orderBy: { createdAt: "desc" },

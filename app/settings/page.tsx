@@ -2,6 +2,10 @@ import { prisma } from "@/lib/db";
 import SettingsClient from "@/components/SettingsClient";
 import { resolveInitialProject } from "@/lib/settingsProject";
 
+// Render on every request — direct DB writes (scripts/board.ts) bypass
+// revalidatePath, so caching would serve stale data until a redeploy (VSK-38).
+export const revalidate = 0;
+
 // `searchParams` is async in the App Router (Next 15). A `?project=<id>` param
 // (from a "Manage labels" link on a ticket) pre-scopes Settings to that
 // project instead of the newest one (VSK-28).

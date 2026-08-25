@@ -6,7 +6,11 @@ for what Frederik is working on across all his projects.
 
 ## Stack
 - Next.js 15 (App Router) + TypeScript
-- Prisma ORM + SQLite at `prisma/dev.db`
+- Prisma ORM + **Postgres (Neon)** — hosted on Vercel. The board is LIVE; the
+  local SQLite `prisma/dev.db` is a retired legacy copy (kept for history, not
+  the source of truth). Connect via `DATABASE_URL` (Neon pooled string), which
+  the app reads on Vercel and local tooling reads from a gitignored repo-root
+  `.env`.
 - Custom Pointer-Events drag-and-drop (no extra deps) — VSK-14 replaced the
   original native HTML5 DnD so the dragged card is carried on the pointer at full
   opacity with a gap that opens at the drop position; Pointer Events are a
@@ -35,22 +39,26 @@ A ticket's current status = which column it sits in. "Closed" (acceptance) = don
   to-dos/recurring reminders), separate repo at `/mnt/c/Users/frede/Vishnu`.
 - **GAN — Ganesh**: board created, no tickets yet (purpose TBD).
 
-## Reading the live board (do this — tickets change)
-The ticket list below is a dated snapshot. For the *current* state, read the DB.
-`sqlite3` CLI is not installed; use Python:
+## Reading & writing the live board (do this — tickets change)
+The board is the hosted Neon Postgres DB. Read and write it with the Node/Prisma
+tool `scripts/board.ts` (VSK-38 cutover — it replaced the old Python `board.py`,
+which wrote the now-retired local SQLite `dev.db`). It talks to whatever
+`DATABASE_URL` points at, so set that to the live Neon **pooled** string in a
+gitignored repo-root `.env` first (a live credential — never commit it or paste
+it in chat/tickets).
 
 ```bash
-cd /mnt/c/Users/frede/Vishvakarma && python3 - <<'PY'
-import sqlite3
-c=sqlite3.connect('prisma/dev.db'); c.row_factory=sqlite3.Row
-rows=c.execute('''select p.key,t.number,col.board,col.name col,t.title,t.description
-  from Ticket t join "Column" col on col.id=t.columnId
-  join Project p on p.id=col.projectId
-  order by p.key,col."order",t."order"''').fetchall()
-for r in rows:
-    print(f'{r["key"]}-{r["number"]:<3}| {r["board"]:11}| {r["col"]:11}| {r["title"]}')
-PY
+cd /mnt/c/Users/frede/Vishvakarma
+# read the current board (all projects, or one with --project VSK):
+npx tsx scripts/board.ts list
+# create / move tickets (writes the LIVE board):
+npx tsx scripts/board.ts create --project VSK --title "..." [--column Open]
+npx tsx scripts/board.ts edit VSK-12 --column Developing
 ```
+
+Board pages render dynamically (`revalidate = 0`), so writes made this way show
+up on the live site immediately — no redeploy needed. `python3 scripts/board.py`
+is retired and will refuse to run.
 
 ## Board snapshot — 2026-08-19 (read the DB for current state)
 **VSH — Vishnu**

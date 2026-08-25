@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 import Board from "@/components/Board";
 import { boardLabel, isBoardSlug } from "@/lib/boards";
 
+// Render on every request: the board is also written out-of-band by
+// scripts/board.ts (direct DB), which never triggers revalidatePath, so a
+// cached page would show stale data until a redeploy (VSK-38).
+export const revalidate = 0;
+
 export default async function BoardPage({
   params,
 }: {
