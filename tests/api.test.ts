@@ -40,6 +40,42 @@ describe("POST /api/tickets — per-project number assignment", () => {
   });
 });
 
+describe("POST /api/tickets — concurrent creates (VSK-32 regression)", () => {
+  it("gives N racing creates unique, gapless numbers 1..N with no failure", async () => {
+    const p = await freshProject("CC");
+    const col = p.columns[0];
+    const N = 20;
+
+    // Fire N creates on one fresh project simultaneously. Under Postgres READ
+    // COMMITTED the naive max()+1 read races and collides on
+    // @@unique([projectId, number]); the route must retry so every one lands.
+    const results = await Promise.allSettled(
+      Array.from({ length: N }, (_, i) =>
+        createTicket(post({ columnId: col.id, title: `c${i}` }))
+      )
+    );
+
+    // No request may throw (a throw = 500 in Next = lost ticket) and each must
+    // return 201.
+    type CreateResult = Awaited<ReturnType<typeof createTicket>>;
+    const fulfilled = results.filter(
+      (r): r is PromiseFulfilledResult<CreateResult> => r.status === "fulfilled"
+    );
+    expect(fulfilled.length).toBe(N);
+    expect(fulfilled.map((r) => r.value.status)).toEqual(Array(N).fill(201));
+
+    // The persisted numbers are exactly the contiguous set 1..N (unique, no gaps).
+    const rows = await prisma.ticket.findMany({
+      where: { projectId: p.id },
+      orderBy: { number: "asc" },
+      select: { number: true },
+    });
+    expect(rows.map((r) => r.number)).toEqual(
+      Array.from({ length: N }, (_, i) => i + 1)
+    );
+  });
+});
+
 describe("POST /api/tickets — description length cap (VSK-22)", () => {
   it("rejects a description over LIMITS.ticketDescription with 400 and stores nothing", async () => {
     const p = await freshProject("DC");

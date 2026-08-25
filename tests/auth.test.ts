@@ -182,7 +182,13 @@ describe("middleware gate", () => {
   it("rejects a tampered session cookie", async () => {
     process.env.VSK_ACCESS_PASSWORD = PASSWORD;
     const token = await signSession(PASSWORD);
-    const bad = token.slice(0, -1) + (token.at(-1) === "A" ? "B" : "A");
+    // Tamper a SIGNIFICANT signature byte, not the trailing base64 char. HMAC-
+    // SHA256 is 32 bytes, so the signature's final base64url char only carries
+    // padding bits that atob discards — flipping it can decode to the identical
+    // bytes and verify true (~6% flake). sig[0] carries real signature bits, so
+    // verification fails deterministically.
+    const [payload, sig] = token.split(".");
+    const bad = payload + "." + (sig[0] === "A" ? "B" : "A") + sig.slice(1);
     const res = await middleware(
       req("/api/tickets", { accept: "application/json", cookie: `${COOKIE_NAME}=${bad}` })
     );
