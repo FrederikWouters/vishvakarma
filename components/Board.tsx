@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { BOARDS } from "@/lib/boards";
-import TicketModal from "./TicketModal";
+// The ticket modal pulls in the whole TipTap/RichText editor (~150 kB of JS).
+// The board itself never needs it until a card is opened, so load it lazily:
+// this keeps the editor out of the board route's first-load bundle and only
+// fetches it on the first modal open. ssr:false is safe — the modal is
+// interactive-only and never rendered on the server (it opens on click).
+const TicketModal = dynamic(() => import("./TicketModal"), { ssr: false });
 import { useDialogs } from "./Dialogs";
 import { stripHtml } from "@/lib/html";
 import { LIMITS } from "@/lib/limits";

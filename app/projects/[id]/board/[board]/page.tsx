@@ -11,31 +11,36 @@ export default async function BoardPage({
   const { id, board } = await params;
   if (!isBoardSlug(board)) notFound();
 
-  const project = await prisma.project.findUnique({
-    where: { id },
-    include: {
-      columns: {
-        where: { board },
-        orderBy: { order: "asc" },
-        include: {
-          tickets: {
-            orderBy: { order: "asc" },
-            include: { labels: { orderBy: { name: "asc" } } },
+  // These two reads are independent (the sequence keys off the route `id`, not
+  // the fetched project), so run them in parallel: on serverless against a
+  // networked Postgres (Neon) every serial query adds a full round-trip of
+  // latency to the board render. One Promise.all removes that waterfall.
+  const [project, sequence] = await Promise.all([
+    prisma.project.findUnique({
+      where: { id },
+      include: {
+        columns: {
+          where: { board },
+          orderBy: { order: "asc" },
+          include: {
+            tickets: {
+              orderBy: { order: "asc" },
+              include: { labels: { orderBy: { name: "asc" } } },
+            },
           },
         },
       },
-    },
-  });
+    }),
+    // Full ordered column sequence across every board, so "Advance" can move a
+    // ticket into the next column even when it lives on a different board.
+    prisma.column.findMany({
+      where: { projectId: id },
+      orderBy: { order: "asc" },
+      select: { id: true, name: true, board: true },
+    }),
+  ]);
 
   if (!project) notFound();
-
-  // Full ordered column sequence across every board, so "Advance" can move a
-  // ticket into the next column even when it lives on a different board.
-  const sequence = await prisma.column.findMany({
-    where: { projectId: id },
-    orderBy: { order: "asc" },
-    select: { id: true, name: true, board: true },
-  });
 
   return (
     <div>
