@@ -394,8 +394,45 @@ button:hover {
   cursor: grabbing;
 }
 
-.ticket.dragging {
-  opacity: 0.4;
+/* VSK-14 custom pointer-drag: the dragged card is lifted onto the pointer at
+   full opacity (not the old 0.4-in-place). This clone is fixed to the viewport
+   and pointer-events:none so document.elementFromPoint hit-tests the board
+   beneath it. `left/top:0` + translate keeps it under the finger/cursor. */
+.ticket-carried {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  margin: 0;
+  pointer-events: none;
+  cursor: grabbing;
+  opacity: 1;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  transform-origin: top left;
+  will-change: transform;
+}
+/* Snap-to-slot settle on release (~150ms, matching the app's transitions). */
+.ticket-carried.snapping {
+  transition: transform 150ms ease-out;
+}
+
+/* The gap the remaining cards open to show where the card will land. Its height
+   animates so the neighbours slide apart/together rather than jumping (FR2/FR4).
+   Replaces the old 3px .drop-indicator line — the gap itself is the cue. */
+.ticket-gap {
+  margin-bottom: 8px;
+  border: 2px dashed var(--accent);
+  border-radius: 10px;
+  background: var(--panel);
+  box-sizing: border-box;
+  transition: height 140ms ease-out;
+}
+
+/* Suppress text selection and show the grabbing cursor everywhere while a drag
+   is in progress. */
+body.board-dragging {
+  user-select: none;
+  cursor: grabbing;
 }
 
 .ticket-id {
@@ -709,6 +746,17 @@ button:hover {
   border-color: var(--text);
 }
 
+.modal-manage-labels {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.modal-manage-labels:hover {
+  text-decoration: underline;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -858,11 +906,19 @@ button:hover {
   gap: 3px;
 }
 
+.settings-newlabel-caption {
+  margin-top: 14px;
+  font-size: 12px;
+}
+.settings-newlabel-caption strong {
+  color: var(--text);
+}
+
 .settings-newlabel {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 6px;
   flex-wrap: wrap;
 }
 

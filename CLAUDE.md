@@ -7,7 +7,10 @@ for what Frederik is working on across all his projects.
 ## Stack
 - Next.js 15 (App Router) + TypeScript
 - Prisma ORM + SQLite at `prisma/dev.db`
-- Native HTML5 drag-and-drop (no extra deps)
+- Custom Pointer-Events drag-and-drop (no extra deps) — VSK-14 replaced the
+  original native HTML5 DnD so the dragged card is carried on the pointer at full
+  opacity with a gap that opens at the drop position; Pointer Events are a
+  browser primitive, so this keeps the "no extra deps" rule.
 - Local dev: `npm run dev` → http://localhost:3000
 
 ## Data model (`prisma/schema.prisma`)

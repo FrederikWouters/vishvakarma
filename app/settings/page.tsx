@@ -1,7 +1,16 @@
 import { prisma } from "@/lib/db";
 import SettingsClient from "@/components/SettingsClient";
+import { resolveInitialProject } from "@/lib/settingsProject";
 
-export default async function SettingsPage() {
+// `searchParams` is async in the App Router (Next 15). A `?project=<id>` param
+// (from a "Manage labels" link on a ticket) pre-scopes Settings to that
+// project instead of the newest one (VSK-28).
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ project?: string }>;
+}) {
+  const { project: requestedProject } = await searchParams;
   const projects = await prisma.project.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -27,13 +36,15 @@ export default async function SettingsPage() {
     labels: p.labels.map((l) => ({ id: l.id, name: l.name, color: l.color })),
   }));
 
+  const initialProjectId = resolveInitialProject(data, requestedProject);
+
   return (
     <div>
       <h1 className="page-title">Settings</h1>
       {data.length === 0 ? (
         <p className="subtle">No projects yet. Create one from the home page first.</p>
       ) : (
-        <SettingsClient projects={data} />
+        <SettingsClient projects={data} initialProjectId={initialProjectId} />
       )}
     </div>
   );

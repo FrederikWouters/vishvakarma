@@ -232,6 +232,13 @@ export default function TicketModal({
           </button>
         </div>
 
+        {/* Deep-link to Settings pre-scoped to THIS ticket's project, so the
+            labels managed there match the ones offered here (VSK-28 FR1/FR2).
+            A real <a href> — keyboard-focusable and new-tab friendly. */}
+        <a className="modal-manage-labels" href={`/settings?project=${projectId}`}>
+          Manage labels in Settings →
+        </a>
+
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>
             Cancel

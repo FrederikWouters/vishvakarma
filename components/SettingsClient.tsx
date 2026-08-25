@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BOARDS } from "@/lib/boards";
 import { useDialogs } from "./Dialogs";
 import { LIMITS } from "@/lib/limits";
+import { resolveInitialProject } from "@/lib/settingsProject";
 
 const PALETTE = [
   "#6b7280", "#ef4444", "#f59e0b", "#10b981",
@@ -24,10 +25,20 @@ async function api(path: string, method: string, body?: unknown) {
   return { ok: res.ok, data } as { ok: boolean; data: any };
 }
 
-export default function SettingsClient({ projects: initial }: { projects: Proj[] }) {
+export default function SettingsClient({
+  projects: initial,
+  initialProjectId,
+}: {
+  projects: Proj[];
+  initialProjectId?: string;
+}) {
   const dialogs = useDialogs();
   const [projects, setProjects] = useState<Proj[]>(initial);
-  const [selectedId, setSelectedId] = useState<string>(initial[0]?.id ?? "");
+  // Open on the requested project (e.g. from a ticket's "Manage labels" link),
+  // not the newest one — that mismatch was the VSK-28 bug.
+  const [selectedId, setSelectedId] = useState<string>(
+    resolveInitialProject(initial, initialProjectId)
+  );
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState(PALETTE[0]);
 
@@ -209,7 +220,9 @@ export default function SettingsClient({ projects: initial }: { projects: Proj[]
       </section>
 
       <section className="settings-section">
-        <h2 className="settings-heading">Labels</h2>
+        <h2 className="settings-heading">
+          Labels for {project.name} ({project.key})
+        </h2>
         {project.labels.length === 0 && (
           <div className="subtle settings-empty">No labels yet</div>
         )}
@@ -238,6 +251,13 @@ export default function SettingsClient({ projects: initial }: { projects: Proj[]
           </div>
         ))}
 
+        {/* FR4: state the target project right at the point of creation, as
+            real text (WCAG 1.4.1), so a label can never be created against the
+            wrong project by surprise. Reads the same `project` the create call
+            uses, so it can't drift. */}
+        <div className="settings-newlabel-caption subtle">
+          New label for <strong>{project.name} ({project.key})</strong>
+        </div>
         <div className="settings-newlabel">
           <input
             className="modal-input modal-input-inline"

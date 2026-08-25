@@ -9,6 +9,7 @@ import { POST as createTicket } from "@/app/api/tickets/route";
 import { PATCH as reorder } from "@/app/api/tickets/reorder/route";
 import { PATCH as patchTicket } from "@/app/api/tickets/[id]/route";
 import { DELETE as deleteColumn } from "@/app/api/columns/[id]/route";
+import { GET as getLabels, POST as createLabel } from "@/app/api/labels/route";
 
 function post(body: unknown) {
   return new Request("http://test/api", {
@@ -292,5 +293,55 @@ describe("PATCH /api/tickets/[id] — server backstop for description HTML (VSK-
       '<p onclick="steal()">x</p><script>alert(1)</script><a href="javascript:alert(1)">l</a>'
     );
     expect(out).not.toMatch(/<script|onclick|javascript:/i);
+  });
+});
+
+describe("GET/POST /api/labels — labels are scoped per project (VSK-28)", () => {
+  function labelPost(body: unknown) {
+    return new Request("http://test/api/labels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+  async function labelsFor(projectId: string) {
+    const res = await getLabels(
+      new Request(`http://test/api/labels?projectId=${projectId}`)
+    );
+    expect(res.status).toBe(200);
+    return (await res.json()) as { id: string; name: string }[];
+  }
+
+  it("returns only the requesting project's labels, so Settings-for-P == modal-for-P (FR3/FR5)", async () => {
+    const pa = await freshProject("LA");
+    const pb = await freshProject("LB");
+    await createLabel(labelPost({ projectId: pa.id, name: "alpha" }));
+    await createLabel(labelPost({ projectId: pb.id, name: "beta" }));
+
+    const aNames = (await labelsFor(pa.id)).map((l) => l.name);
+    const bNames = (await labelsFor(pb.id)).map((l) => l.name);
+    expect(aNames).toEqual(["alpha"]);
+    expect(bNames).toEqual(["beta"]);
+    // A label created on B must NOT appear on A — this is exactly the context
+    // mismatch VSK-28 fixes at the UI layer; the scoping itself is correct.
+    expect(aNames).not.toContain("beta");
+  });
+
+  it("is idempotent on [projectId, name] and keeps same-named labels distinct across projects (FR6)", async () => {
+    const pa = await freshProject("LC");
+    const pb = await freshProject("LD");
+    // Same name twice on A → one row, reused (200 not a duplicate).
+    const first = await createLabel(labelPost({ projectId: pa.id, name: "dup" }));
+    const second = await createLabel(labelPost({ projectId: pa.id, name: "dup" }));
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(200);
+    expect((await first.json()).id).toBe((await second.json()).id);
+    expect(await labelsFor(pa.id)).toHaveLength(1);
+
+    // Same name on a different project is a separate label (per-project unique).
+    await createLabel(labelPost({ projectId: pb.id, name: "dup" }));
+    const aDup = (await labelsFor(pa.id)).find((l) => l.name === "dup");
+    const bDup = (await labelsFor(pb.id)).find((l) => l.name === "dup");
+    expect(aDup && bDup && aDup.id !== bDup.id).toBe(true);
   });
 });
