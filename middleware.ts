@@ -44,6 +44,6 @@ export async function middleware(req: NextRequest) {
 // default. Reviewed against the 8 app/api data routes; none is excluded here.
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|login|api/auth/login|api/auth/logout).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|login|api/auth/login|api/auth/logout).*)",
   ],
 };
