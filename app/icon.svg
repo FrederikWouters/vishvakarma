@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Vishvakarma">
+  <defs>
+    <radialGradient id="bg2" cx="50%" cy="40%" r="75%">
+      <stop offset="0%" stop-color="#8a2a26"/>
+      <stop offset="100%" stop-color="#3d0f0d"/>
+    </radialGradient>
+    <linearGradient id="gold2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe08a"/>
+      <stop offset="55%" stop-color="#f2b83f"/>
+      <stop offset="100%" stop-color="#c98a20"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg2)"/>
+  <!-- baseline ruler -->
+  <g>
+    <rect x="112" y="366" width="288" height="34" rx="8" fill="url(#gold2)"/>
+    <g stroke="#3d0f0d" stroke-width="7" stroke-linecap="round">
+      <line x1="160" y1="366" x2="160" y2="384"/>
+      <line x1="208" y1="366" x2="208" y2="388"/>
+      <line x1="256" y1="366" x2="256" y2="384"/>
+      <line x1="304" y1="366" x2="304" y2="388"/>
+      <line x1="352" y1="366" x2="352" y2="384"/>
+    </g>
+  </g>
+  <!-- compass legs (A-frame) -->
+  <g stroke="url(#gold2)" stroke-width="30" stroke-linecap="round" fill="none">
+    <line x1="256" y1="150" x2="176" y2="360"/>
+    <line x1="256" y1="150" x2="336" y2="360"/>
+  </g>
+  <!-- pivot hinge + top knob -->
+  <path d="M256 96 l20 44 h-40 Z" fill="url(#gold2)"/>
+  <circle cx="256" cy="150" r="30" fill="url(#gold2)"/>
+  <circle cx="256" cy="150" r="12" fill="#3d0f0d"/>
+  <!-- feet -->
+  <circle cx="176" cy="360" r="15" fill="url(#gold2)"/>
+  <circle cx="336" cy="360" r="15" fill="url(#gold2)"/>
+</svg>
