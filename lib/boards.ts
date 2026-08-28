@@ -31,4 +31,7 @@ export const DEFAULT_COLUMNS: { name: string; board: BoardSlug }[] = [
   { name: "To Accept", board: "acceptance" },
   { name: "Accepted", board: "acceptance" },
   { name: "Closed", board: "acceptance" },
+  { name: "Cancelled", board: "acceptance" },
 ];
+
+export const CANCELLED_COLUMN = "Cancelled";

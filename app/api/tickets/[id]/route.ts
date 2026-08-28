@@ -1,17 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { LIMITS } from "@/lib/limits";
-import { revalidateBoards, revalidateSettings } from "@/lib/revalidate";
-
-// Server-side backstop for description HTML (the client already allowlist-
-// sanitizes). Strips script/style blocks, inline event handlers, and
-// javascript: URLs so nothing dangerous is ever persisted.
-function stripDangerousHtml(html: string): string {
-  return html
-    .replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/(href|src)\s*=\s*("javascript:[^"]*"|'javascript:[^']*')/gi, "");
-}
+import { stripDangerousHtml } from "@/lib/html";
+import { revalidateBoards, revalidateHome, revalidateSettings } from "@/lib/revalidate";
 
 export async function GET(
   _req: Request,
@@ -108,6 +99,7 @@ export async function DELETE(
     await prisma.ticket.delete({ where: { id } });
     revalidateBoards();
     revalidateSettings();
+    revalidateHome();
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Ticket not found" }, { status: 404 });

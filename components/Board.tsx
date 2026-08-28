@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { BOARDS } from "@/lib/boards";
+import { BOARDS, CANCELLED_COLUMN } from "@/lib/boards";
 // The ticket modal pulls in the whole TipTap/RichText editor (~150 kB of JS).
 // The board itself never needs it until a card is opened, so load it lazily:
 // this keeps the editor out of the board route's first-load bundle and only
@@ -166,13 +166,31 @@ export default function Board({
     );
   }
 
-  function updateTicket(updated: Ticket) {
-    setColumns((prev) =>
-      prev.map((c) => ({
-        ...c,
-        tickets: c.tickets.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)),
-      }))
-    );
+  function updateTicket(updated: Ticket, newColumnId?: string) {
+    if (newColumnId) {
+      // columnId already updated on the ticket object from the API response;
+      // remove it from the old column and add to the new one if visible.
+      setColumns((prev) => {
+        const cleared = prev.map((c) => ({
+          ...c,
+          tickets: c.tickets.filter((t) => t.id !== updated.id),
+        }));
+        const targetVisible = cleared.some((c) => c.id === newColumnId);
+        if (!targetVisible) return cleared;
+        return cleared.map((c) =>
+          c.id === newColumnId
+            ? { ...c, tickets: [...c.tickets, { ...updated, columnId: newColumnId }] }
+            : c
+        );
+      });
+    } else {
+      setColumns((prev) =>
+        prev.map((c) => ({
+          ...c,
+          tickets: c.tickets.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)),
+        }))
+      );
+    }
   }
 
   async function reorderColumn(cols: ColumnData[], columnId: string): Promise<boolean> {
@@ -269,16 +287,20 @@ export default function Board({
   }
 
   // Adjacent columns in the whole project sequence, or null at the ends.
+  // The Cancelled column is off-flow: reachable only by explicit status change
+  // (dropdown/drag), never by stepping with Back/Advance.
+  const flowSequence = sequence.filter((c) => c.name !== CANCELLED_COLUMN);
+
   function nextColumn(columnId: string): SequenceColumn | null {
-    const idx = sequence.findIndex((c) => c.id === columnId);
-    if (idx < 0 || idx >= sequence.length - 1) return null;
-    return sequence[idx + 1];
+    const idx = flowSequence.findIndex((c) => c.id === columnId);
+    if (idx < 0 || idx >= flowSequence.length - 1) return null;
+    return flowSequence[idx + 1];
   }
 
   function prevColumn(columnId: string): SequenceColumn | null {
-    const idx = sequence.findIndex((c) => c.id === columnId);
+    const idx = flowSequence.findIndex((c) => c.id === columnId);
     if (idx <= 0) return null;
-    return sequence[idx - 1];
+    return flowSequence[idx - 1];
   }
 
   // Move a ticket to an adjacent column (used by both Advance and Back).
@@ -764,13 +786,12 @@ export default function Board({
       {modalTicketId && (() => {
         const t = columns.flatMap((c) => c.tickets).find((x) => x.id === modalTicketId);
         if (!t) return null;
-        const statusName = columns.find((c) => c.id === t.columnId)?.name ?? "";
         return (
           <TicketModal
             ticket={t}
             projectId={projectId}
             projectKey={projectKey}
-            statusName={statusName}
+            sequence={sequence}
             onClose={() => setModalTicketId(null)}
             onSaved={updateTicket}
           />

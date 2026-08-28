@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Ticket, Label } from "./Board";
+import type { Ticket, Label, SequenceColumn } from "./Board";
 import { RichTextEditor, sanitizeHtml, stripHtml } from "./RichText";
 import { useDialogs } from "./Dialogs";
 import { LIMITS } from "@/lib/limits";
@@ -16,19 +16,20 @@ export default function TicketModal({
   ticket,
   projectId,
   projectKey,
-  statusName,
+  sequence,
   onClose,
   onSaved,
 }: {
   ticket: Ticket;
   projectId: string;
   projectKey: string;
-  statusName: string;
+  sequence: SequenceColumn[];
   onClose: () => void;
-  onSaved: (t: Ticket) => void;
+  onSaved: (t: Ticket, newColumnId?: string) => void;
 }) {
   const [title, setTitle] = useState(ticket.title);
   const [description, setDescription] = useState(ticket.description ?? "");
+  const [selectedColumnId, setSelectedColumnId] = useState(ticket.columnId);
   const [labels, setLabels] = useState<Label[]>(ticket.labels);
   const [allLabels, setAllLabels] = useState<Label[]>([]);
   const [newName, setNewName] = useState("");
@@ -98,14 +99,18 @@ export default function TicketModal({
       // Sanitize the editor HTML; collapse an effectively-empty body to "".
       const cleanHtml = sanitizeHtml(description);
       const descOut = stripHtml(cleanHtml) ? cleanHtml : "";
+      const patchBody: Record<string, unknown> = {
+        title: title.trim() || ticket.title,
+        description: descOut,
+        labelIds: finalLabels.map((l) => l.id),
+      };
+      if (selectedColumnId !== ticket.columnId) {
+        patchBody.columnId = selectedColumnId;
+      }
       const res = await fetch(`/api/tickets/${ticket.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim() || ticket.title,
-          description: descOut,
-          labelIds: finalLabels.map((l) => l.id),
-        }),
+        body: JSON.stringify(patchBody),
       });
       if (!res.ok) {
         // Surface the failure instead of silently returning; the modal stays
@@ -117,12 +122,17 @@ export default function TicketModal({
         return;
       }
       const updated = await res.json();
-      onSaved({
-        ...ticket,
-        title: updated.title,
-        description: updated.description,
-        labels: updated.labels ?? finalLabels,
-      });
+      const newColumnId = selectedColumnId !== ticket.columnId ? selectedColumnId : undefined;
+      onSaved(
+        {
+          ...ticket,
+          title: updated.title,
+          description: updated.description,
+          columnId: updated.columnId ?? ticket.columnId,
+          labels: updated.labels ?? finalLabels,
+        },
+        newColumnId,
+      );
       onClose();
     } catch {
       // Network error / fetch threw — don't leave the button stuck on "Saving…".
@@ -152,7 +162,26 @@ export default function TicketModal({
           <span className="modal-key">
             {projectKey}-{ticket.number}
           </span>
-          <span className="modal-status">{statusName}</span>
+          <select
+            className="modal-status-select"
+            value={selectedColumnId}
+            onChange={(e) => setSelectedColumnId(e.target.value)}
+            aria-label="Ticket status"
+          >
+            {(["analysis", "development", "acceptance"] as const).map((board) => {
+              const cols = sequence.filter((c) => c.board === board);
+              if (cols.length === 0) return null;
+              return (
+                <optgroup key={board} label={board[0].toUpperCase() + board.slice(1)}>
+                  {cols.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
+          </select>
           <button className="modal-close" onClick={onClose} aria-label="Close">
             ×
           </button>

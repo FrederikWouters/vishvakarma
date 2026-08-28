@@ -14,7 +14,7 @@ export function revalidateSettings() {
   revalidatePath("/settings");
 }
 
-// The projects home grid — a project or its column count changed.
+// The projects home grid — a project or its ticket count changed.
 export function revalidateHome() {
   revalidatePath("/");
 }

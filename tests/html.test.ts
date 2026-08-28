@@ -5,7 +5,7 @@
 // security-critical allowlist is actually exercised; the default node env for
 // the DB-backed suites is unaffected (per-file pragma).
 import { describe, it, expect } from "vitest";
-import { sanitizeHtml, stripHtml, toInitialHtml } from "@/lib/html";
+import { sanitizeHtml, stripHtml, stripDangerousHtml, toInitialHtml } from "@/lib/html";
 
 describe("sanitizeHtml — allowlist", () => {
   it("keeps the base formatting tags", () => {
@@ -73,6 +73,27 @@ describe("sanitizeHtml — allowlist", () => {
       "<details><summary>TA</summary><p>hidden</p>" +
       "<table><tbody><tr><th><p></p></th></tr></tbody></table></details><p></p>";
     expect(sanitizeHtml(clean)).toBe(clean);
+  });
+});
+
+describe("stripDangerousHtml — server backstop (VSK-30)", () => {
+  it("strips script blocks, on* handlers, and javascript: URLs", () => {
+    const input = '<p onclick="steal()">x</p><script>alert(1)</script><a href="javascript:alert(1)">l</a>';
+    const out = stripDangerousHtml(input);
+    expect(out).not.toMatch(/<script|onclick|javascript:/i);
+  });
+
+  it("preserves safe HTML (details, tables, formatting)", () => {
+    const html =
+      "<details><summary>TA</summary><p>hidden</p></details>" +
+      "<table><tbody><tr><th>H</th></tr><tr><td>c</td></tr></tbody></table>";
+    expect(stripDangerousHtml(html)).toBe(html);
+  });
+
+  it("strips style blocks", () => {
+    const out = stripDangerousHtml("<style>body{display:none}</style><p>ok</p>");
+    expect(out).not.toMatch(/<style/i);
+    expect(out).toBe("<p>ok</p>");
   });
 });
 

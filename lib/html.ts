@@ -29,6 +29,16 @@ export function sanitizeHtml(html: string): string {
   return doc.body.innerHTML;
 }
 
+// Server-side backstop for description HTML (the client already allowlist-
+// sanitizes). Strips script/style blocks, inline event handlers, and
+// javascript: URLs so nothing dangerous is ever persisted.
+export function stripDangerousHtml(html: string): string {
+  return html
+    .replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src)\s*=\s*("javascript:[^"]*"|'javascript:[^']*')/gi, "");
+}
+
 // Plain-text reduction for card teasers — isomorphic (no DOMParser).
 export function stripHtml(html: string): string {
   return html

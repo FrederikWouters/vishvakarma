@@ -9,7 +9,7 @@ export const revalidate = 0;
 export default async function HomePage() {
   const projects = await prisma.project.findMany({
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { columns: true } } },
+    include: { _count: { select: { tickets: true } } },
   });
 
   return (
@@ -29,7 +29,7 @@ export default async function HomePage() {
             <a key={p.id} href={`/projects/${p.id}/board/analysis`} className="project-card">
               <div className="name">{p.name}</div>
               <div className="subtle" style={{ fontSize: 12, marginTop: 6 }}>
-                {p._count.columns} columns
+                {p._count.tickets} {p._count.tickets === 1 ? "ticket" : "tickets"}
               </div>
             </a>
           ))}

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { stripDangerousHtml } from "@/lib/html";
 import { LIMITS } from "@/lib/limits";
-import { revalidateBoards, revalidateSettings } from "@/lib/revalidate";
+import { revalidateBoards, revalidateHome, revalidateSettings } from "@/lib/revalidate";
 
 // The per-project ticket number is derived from the current max and written
 // under the @@unique([projectId, number]) constraint. On Postgres READ
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
   const columnId = typeof body?.columnId === "string" ? body.columnId : "";
   const title = typeof body?.title === "string" ? body.title.trim() : "";
   const description =
-    typeof body?.description === "string" ? body.description.trim() || null : null;
+    typeof body?.description === "string" ? stripDangerousHtml(body.description).trim() || null : null;
   const order = Number.isInteger(body?.order) ? body.order : 0;
 
   if (!columnId || !title) {
@@ -72,6 +73,7 @@ export async function POST(req: Request) {
 
       revalidateBoards();
       revalidateSettings();
+      revalidateHome();
       return NextResponse.json(ticket, { status: 201 });
     } catch (err) {
       const isNumberRace =

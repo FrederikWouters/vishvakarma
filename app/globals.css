@@ -635,6 +635,20 @@ body.board-dragging {
   padding: 2px 10px;
 }
 
+.modal-status-select {
+  font-size: 12px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.modal-status-select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .modal-close {
   margin-left: auto;
   background: transparent;

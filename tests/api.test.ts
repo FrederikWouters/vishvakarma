@@ -1,13 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 
 // revalidatePath only works inside a Next request context; stub it for tests.
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+const revalidatePathMock = vi.fn();
+vi.mock("next/cache", () => ({ revalidatePath: (...args: unknown[]) => revalidatePathMock(...args) }));
 
 import { prisma } from "@/lib/db";
 import { LIMITS } from "@/lib/limits";
 import { POST as createTicket } from "@/app/api/tickets/route";
 import { PATCH as reorder } from "@/app/api/tickets/reorder/route";
-import { PATCH as patchTicket } from "@/app/api/tickets/[id]/route";
+import { PATCH as patchTicket, DELETE as deleteTicket } from "@/app/api/tickets/[id]/route";
 import { DELETE as deleteColumn } from "@/app/api/columns/[id]/route";
 import { GET as getLabels, POST as createLabel } from "@/app/api/labels/route";
 
@@ -343,5 +344,89 @@ describe("GET/POST /api/labels — labels are scoped per project (VSK-28)", () =
     const aDup = (await labelsFor(pa.id)).find((l) => l.name === "dup");
     const bDup = (await labelsFor(pb.id)).find((l) => l.name === "dup");
     expect(aDup && bDup && aDup.id !== bDup.id).toBe(true);
+  });
+});
+
+describe("POST /api/tickets — server backstop parity with PATCH (VSK-30)", () => {
+  async function createWithDescription(description: string) {
+    const p = await freshProject("CP" + Math.random().toString(36).slice(2, 6).toUpperCase());
+    const col = p.columns[0];
+    const res = await createTicket(post({ columnId: col.id, title: "x", description }));
+    expect(res.status).toBe(201);
+    return (await res.json()).description as string | null;
+  }
+
+  async function patchWithDescription(description: string) {
+    const p = await freshProject("PP" + Math.random().toString(36).slice(2, 6).toUpperCase());
+    const t = await prisma.ticket.create({
+      data: { columnId: p.columns[0].id, projectId: p.id, number: 1, order: 0, title: "x" },
+    });
+    const req = new Request(`http://test/api/tickets/${t.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description }),
+    });
+    const res = await patchTicket(req, { params: Promise.resolve({ id: t.id }) });
+    expect(res.ok).toBe(true);
+    return (await res.json()).description as string | null;
+  }
+
+  it("produces byte-identical output between POST and PATCH for dangerous payloads", async () => {
+    const payload =
+      '<p onclick="steal()">x</p><script>alert(1)</script><a href="javascript:alert(1)">l</a>';
+    const fromCreate = await createWithDescription(payload);
+    const fromPatch = await patchWithDescription(payload);
+    expect(fromCreate).toBe(fromPatch);
+    expect(fromCreate).not.toMatch(/<script|onclick|javascript:/i);
+  });
+
+  it("stores null when only dangerous content remains after stripping", async () => {
+    const result = await createWithDescription("<script>alert(1)</script>");
+    expect(result).toBeNull();
+  });
+
+  it("preserves legitimate HTML unchanged", async () => {
+    const html =
+      "<details><summary>TA</summary><p>hidden</p></details>" +
+      "<table><tbody><tr><th>H</th></tr><tr><td>c</td></tr></tbody></table>";
+    const result = await createWithDescription(html);
+    expect(result).toBe(html);
+  });
+});
+
+describe("revalidateHome — called on POST and DELETE, not PATCH (VSK-29)", () => {
+  it("POST /api/tickets calls revalidatePath for /", async () => {
+    const p = await freshProject("RH");
+    const col = p.columns[0];
+    revalidatePathMock.mockClear();
+    await createTicket(post({ columnId: col.id, title: "test" }));
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("DELETE /api/tickets/[id] calls revalidatePath for /", async () => {
+    const p = await freshProject("RD");
+    const t = await prisma.ticket.create({
+      data: { columnId: p.columns[0].id, projectId: p.id, number: 1, order: 0, title: "x" },
+    });
+    revalidatePathMock.mockClear();
+    await deleteTicket(new Request("http://test", { method: "DELETE" }), {
+      params: Promise.resolve({ id: t.id }),
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("PATCH /api/tickets/[id] does not call revalidatePath for /", async () => {
+    const p = await freshProject("RN");
+    const t = await prisma.ticket.create({
+      data: { columnId: p.columns[0].id, projectId: p.id, number: 1, order: 0, title: "x" },
+    });
+    revalidatePathMock.mockClear();
+    const req = new Request(`http://test/api/tickets/${t.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "updated" }),
+    });
+    await patchTicket(req, { params: Promise.resolve({ id: t.id }) });
+    expect(revalidatePathMock).not.toHaveBeenCalledWith("/");
   });
 });
