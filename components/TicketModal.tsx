@@ -12,6 +12,71 @@ const PALETTE = [
   "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6",
 ];
 
+function StatusDropdown({
+  sequence,
+  value,
+  onChange,
+}: {
+  sequence: SequenceColumn[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = sequence.find((c) => c.id === value);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  return (
+    <div className="status-dropdown" ref={ref}>
+      <button
+        type="button"
+        className="status-dropdown-trigger"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Ticket status"
+      >
+        {current?.name ?? "—"} <span aria-hidden>▾</span>
+      </button>
+      {open && (
+        <div className="status-dropdown-menu" role="listbox">
+          {(["analysis", "development", "acceptance"] as const).map((board) => {
+            const cols = sequence.filter((c) => c.board === board);
+            if (cols.length === 0) return null;
+            return (
+              <div key={board}>
+                <div className="status-dropdown-group">
+                  {board[0].toUpperCase() + board.slice(1)}
+                </div>
+                {cols.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="option"
+                    aria-selected={c.id === value}
+                    className={`status-dropdown-item${c.id === value ? " selected" : ""}`}
+                    onClick={() => { onChange(c.id); setOpen(false); }}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TicketModal({
   ticket,
   projectId,
@@ -162,26 +227,11 @@ export default function TicketModal({
           <span className="modal-key">
             {projectKey}-{ticket.number}
           </span>
-          <select
-            className="modal-status-select"
+          <StatusDropdown
+            sequence={sequence}
             value={selectedColumnId}
-            onChange={(e) => setSelectedColumnId(e.target.value)}
-            aria-label="Ticket status"
-          >
-            {(["analysis", "development", "acceptance"] as const).map((board) => {
-              const cols = sequence.filter((c) => c.board === board);
-              if (cols.length === 0) return null;
-              return (
-                <optgroup key={board} label={board[0].toUpperCase() + board.slice(1)}>
-                  {cols.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-          </select>
+            onChange={setSelectedColumnId}
+          />
           <button className="modal-close" onClick={onClose} aria-label="Close">
             ×
           </button>
